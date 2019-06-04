@@ -1,0 +1,9 @@
+*.txt
+*.pyc
+*.csv
+*.tgz
+*.iml
+*.json
+.ipynb_checkpoints
+.idea
+trackdata
