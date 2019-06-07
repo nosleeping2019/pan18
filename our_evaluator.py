@@ -145,17 +145,20 @@ def evaluate_all(path_collection,path_answers,path_out):
             problems.append(attrib['problem-name'])
     scores=[]
     for problem in problems:
-        f1,precision,recall,accuracy=evaluate(path_collection+os.sep+problem+os.sep+'ground-truth.json',path_answers+os.sep+'answers-'+problem+'.json')
+        # with using different features and ml methods, 'embedding-svm-' should be replaced by different feature and ml method combinations
+        f1,precision,recall,accuracy=evaluate(path_collection+os.sep+problem+os.sep+'ground-truth.json',path_answers+os.sep+'answers-'+'embedding-svm-' + problem+'.json')
         scores.append(f1)
         data.append({'problem-name': problem, 'macro-f1': round(f1,3), 'macro-precision': round(precision,3), 'macro-recall': round(recall,3), 'micro-accuracy': round(accuracy,3)})
         print(str(problem),'Macro-F1:',round(f1,3))
     overall_score=sum(scores)/len(scores)
     # Saving data to output files (out.json and evaluation.prototext)
-    with open(path_out+os.sep+'out.json', 'w') as f:
+    # by using different features and ml methods, 'embedding-svm-' should be replaced by different feature and ml method combinations
+    with open(path_out+os.sep+'out-embedding-svm.json', 'w') as f:
         json.dump({'problems': data, 'overall_score': round(overall_score,3)}, f, indent=4, sort_keys=True)
     print('Overall score:', round(overall_score,3))
     prototext='measure {\n key: "mean macro-f1"\n value: "'+str(round(overall_score,3))+'"\n}\n'
-    with open(path_out+os.sep+'evaluation.prototext', 'w') as f:
+    # by using different features and ml methods, 'embedding-svm-' should be replaced by different feature and ml method combinations
+    with open(path_out+os.sep+'evaluation-embedding-svm.prototext', 'w') as f:
         f.write(prototext)
         
 def main():
