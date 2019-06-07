@@ -129,6 +129,7 @@ def baseline(path,outpath,n=3,ft=5,classifier='OneVsRest'):
         else:
             clf=OneVsRestClassifier(LinearSVC(C=1)).fit(scaled_train_data, train_labels)
         predictions=clf.predict(scaled_test_data)
+        print('predictions',predictions)
         # Writing output file
         out_data=[]
         unk_filelist = glob.glob(path+os.sep+problem+os.sep+unk_folder+os.sep+'*.txt')
