@@ -107,7 +107,7 @@ def baseline(path,outpath,n=3,ft=5,classifier='OneVsRest'):
         train_data = vectorizer.fit_transform(train_texts)
         train_data = train_data.astype(float)
         for i,v in enumerate(train_texts):
-            train_data[i]=train_data[i]/len(train_texts[i])
+            train_data[i]=train_data[i]/len(train_texts[i]) #normalize
         print('\t', 'language: ', language[index])
         print('\t', len(candidates), 'candidate authors')
         print('\t', len(train_texts), 'known texts')
@@ -118,7 +118,7 @@ def baseline(path,outpath,n=3,ft=5,classifier='OneVsRest'):
         test_data = vectorizer.transform(test_texts)
         test_data = test_data.astype(float)
         for i,v in enumerate(test_texts):
-            test_data[i]=test_data[i]/len(test_texts[i])
+            test_data[i]=test_data[i]/len(test_texts[i]) # normalize
         print('\t', len(test_texts), 'unknown texts')
         # Applying SVM
         max_abs_scaler = preprocessing.MaxAbsScaler()
@@ -142,22 +142,25 @@ def baseline(path,outpath,n=3,ft=5,classifier='OneVsRest'):
     print('elapsed time:', time.time() - start_time)
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser = argparse.ArgumentParser(description='PAN-18 Baseline Authorship Attribution Method')
-    parser.add_argument('-i', type=str, help='Path to the main folder of a collection of attribution problems')
-    parser.add_argument('-o', type=str, help='Path to an output folder')
-    parser.add_argument('-n', type=int, default=3, help='n-gram order (default=3)')
-    parser.add_argument('-ft', type=int, default=5, help='frequency threshold (default=5)')
-    parser.add_argument('-c', type=str, default='OneVsRest', help='OneVsRest or OneVsOne (default=OneVsRest)')
-    args = parser.parse_args()
-    if not args.i:
-        print('ERROR: The input folder is required')
-        parser.exit(1)
-    if not args.o:
-        print('ERROR: The output folder is required')
-        parser.exit(1)
-    
-    baseline(args.i, args.o, args.n, args.ft, args.c)
+    # parser = argparse.ArgumentParser()
+    # parser = argparse.ArgumentParser(description='PAN-18 Baseline Authorship Attribution Method')
+    # parser.add_argument('-i', type=str, help='Path to the main folder of a collection of attribution problems')
+    # parser.add_argument('-o', type=str, help='Path to an output folder')
+    # parser.add_argument('-n', type=int, default=3, help='n-gram order (default=3)')
+    # parser.add_argument('-ft', type=int, default=5, help='frequency threshold (default=5)')
+    # parser.add_argument('-c', type=str, default='OneVsRest', help='OneVsRest or OneVsOne (default=OneVsRest)')
+    # args = parser.parse_args()
+    # if not args.i:
+    #     print('ERROR: The input folder is required')
+    #     parser.exit(1)
+    # if not args.o:
+    #     print('ERROR: The output folder is required')
+    #     parser.exit(1)
+    # baseline(args.i, args.o, args.n, args.ft, args.c)
+
+    path = 'input/pan18-cross-domain-authorship-attribution-training-dataset-2017-12-02/'
+    outpath = 'output/answers'
+    baseline(path,outpath,3,5)
 
 if __name__ == '__main__':
     main()
