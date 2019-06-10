@@ -229,6 +229,7 @@ def meta_features():
     return meta_trainX, meta_validX, meta_trainY, meta_validY, meta_testX
 
 def tfidffeature():
+    # done
     tfv = TfidfVectorizer(min_df=3,  max_features=None,
                 strip_accents='unicode', analyzer='word',token_pattern=r'\w{1,}',
                 ngram_range=(1, 3), use_idf=1,smooth_idf=1,sublinear_tf=1,
@@ -252,7 +253,7 @@ def countfeature():
                                                                       test_size=0.3, shuffle=True)
     return ctv_trainX, ctv_validX, ctv_trainY, ctv_validY, ctv_testX
 
-def wordembedding():
+def wordembeddingfeature():
     embeddings_index = word_embedding() # where to use embeddings_index ?
     words_vector = np.array([sent2vec(x) for x in train1])
     embedding_testX = np.array([sent2vec(x) for x in test1])
@@ -313,7 +314,7 @@ if __name__ == '__main__':
         meta_trainX, meta_validX, meta_trainY, meta_validY, meta_testX = meta_features()
         # tfv_trainX, tfv_validX, tfv_trainY, tfv_validY, tfv_testX = tfidffeature()
         # ctv_trainX, ctv_validX, ctv_trainY, ctv_validY, ctv_testX = countfeature()
-        # embedding_trainX, embedding_validX, embedding_trainY, embedding_validY, embedding_testX = wordembedding()
+        # embedding_trainX, embedding_validX, embedding_trainY, embedding_validY, embedding_testX = wordembeddingfeature()
 
 
         # now feed them into different models
