@@ -79,7 +79,7 @@ def multiclass_logloss(actual, predicted, eps=1e-15):
     return -1.0 / rows * vsota
 
 
-def meta_features_extractort(corpus):
+def meta_features_extractor(corpus):
     sent_len = []
     word_len = []
     word_num = []
@@ -220,8 +220,8 @@ def meta_features():
     sent_len = []
     sent_len.append(np.mean(list(map(
                 lambda x: len(x.split()), sent_tokenize(train1[0])))))
-    meta_train = meta_features_extractort(train1)
-    meta_testX = meta_features_extractort(test1)
+    meta_train = meta_features_extractor(train1)
+    meta_testX = meta_features_extractor(test1)
     meta_trainX, meta_validX, meta_trainY, meta_validY = train_test_split(meta_train, labels1,
                                                       stratify=labels1,
                                                       random_state=42,
