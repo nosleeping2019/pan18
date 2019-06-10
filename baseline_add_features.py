@@ -33,12 +33,19 @@ import json
 import argparse
 import time
 import codecs
+import numpy as np
 from collections import defaultdict
 from sklearn.svm import LinearSVC
 from sklearn.multiclass import OneVsOneClassifier
 from sklearn.multiclass import OneVsRestClassifier
+from sklearn.preprocessing import StandardScaler
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn import preprocessing
+from string import punctuation
+from nltk.corpus import stopwords
+eng_stopwords = set(stopwords.words("english"))
+from nltk.tokenize import sent_tokenize, word_tokenize
+
 
 def represent_text(text,n):
     # Extracts all character 'n'-grams from  a 'text'
@@ -52,10 +59,10 @@ def represent_text(text,n):
     if n-2 > 0: # extract n-2-gram
         tokens_n_2 = [text[i:i + n - 2] for i in range(len(text) - n + 1)]
         tokens.extend(tokens_n_2)
-    if n-3 > 0:
+    if n-3 > 0: # extract n-3-gram
         tokens_n_3 = [text[i:i + n - 3] for i in range(len(text) - n + 1)]
         tokens.extend(tokens_n_3)
-    if n-4 > 0:
+    if n-4 > 0: # extract n-4-gram
         tokens_n_4 = [text[i:i + n - 4] for i in range(len(text) - n + 1)]
         tokens.extend(tokens_n_4)
     frequency = defaultdict(int)
@@ -89,6 +96,85 @@ def extract_vocabulary(texts,n,ft):
             vocabulary.append(i)
     return vocabulary
 
+def meta_features_extractor(corpus):
+    sent_len = []
+    word_len = []
+    word_num = []
+    single_num = []
+    punct_num = []
+    stop_num = []
+    upper_num = []
+    for paragraph in corpus:
+        ## average lenth of sentences
+        sent_len.append(np.mean(list(map(
+            lambda x: len(x.split()), sent_tokenize(paragraph)))))
+        ## average lenth of words
+        word_len.append(np.mean(list(map(
+            lambda x: len(str(x)), word_tokenize(paragraph)))))
+        ##number of words
+        word_num.append(len(word_tokenize(paragraph)))
+        ##number of single words
+        single_num.append(len([w for w in set(word_tokenize(paragraph)) if w not in punctuation]))
+        ## average number of punctuation in a sentence
+        punct_num.append(np.mean(list(map(
+            lambda x: len([p for p in str(x) if p in punctuation]), sent_tokenize(paragraph)))))
+        ##number of stopwords
+        stop_num.append(np.mean(list(map(
+            lambda x: len([t for t in str(x) if t in eng_stopwords]), sent_tokenize(paragraph)))))
+        ## Number of upper words in the text ##
+        upper_num.append(np.mean(list(map(
+            lambda x: len([t for t in str(x) if t.isupper()]), sent_tokenize(paragraph)))))
+
+        x = np.array([sent_len, word_len, word_num, single_num, punct_num, stop_num, upper_num])
+
+    return x.T
+
+def meta_data(train_texts,test_texts):
+    train_data = meta_features_extractor(train_texts)
+    train_data = train_data.astype(float)
+    for i, v in enumerate(train_texts):
+        train_data[i] = train_data[i] / len(train_texts[i])  # normalize
+    scaler = StandardScaler()
+    scaler.fit_transform(train_data)
+
+    test_data = meta_features_extractor(test_texts)
+    test_data = test_data.astype(float)
+    for i, v in enumerate(test_texts):
+        test_data[i] = test_data[i] / len(test_texts[i])  # normalize
+    scaler.transform(test_data)
+    return scaler, train_data, test_data
+
+def count_data(train_docs, n, ft, train_texts,test_texts):
+    vocabulary = extract_vocabulary(train_docs, n, ft)
+    vectorizer = CountVectorizer(analyzer='char', ngram_range=ngram_range, lowercase=False, vocabulary=vocabulary)
+    train_data = vectorizer.fit_transform(train_texts)
+    train_data = train_data.astype(float)
+    for i, v in enumerate(train_texts):
+        train_data[i] = train_data[i] / len(train_texts[i])  # normalize
+
+    test_data = vectorizer.transform(test_texts)
+    test_data = test_data.astype(float)
+    for i, v in enumerate(test_texts):
+        test_data[i] = test_data[i] / len(test_texts[i])  # normalize
+    return vectorizer, vocabulary,train_data, test_data
+
+def tfidf_data(train_docs, n, ft, train_texts,test_texts):
+    vocabulary = extract_vocabulary(train_docs, n, ft)
+    vectorizer = TfidfVectorizer(min_df=3, max_features=None,
+                                 strip_accents='unicode', analyzer='char', token_pattern=r'\w{1,}',
+                                 ngram_range=ngram_range, use_idf=True, smooth_idf=True, sublinear_tf=True,
+                                 stop_words='english', vocabulary = vocabulary)
+    train_data = vectorizer.fit_transform(train_texts)
+    train_data = train_data.astype(float)
+    for i, v in enumerate(train_texts):
+        train_data[i] = train_data[i] / len(train_texts[i])  # normalize
+    test_data = vectorizer.transform(test_texts)
+    test_data = test_data.astype(float)
+    for i, v in enumerate(test_texts):
+        test_data[i] = test_data[i] / len(test_texts[i])  # normalize
+    return vectorizer, vocabulary, train_data, test_data
+
+
 def baseline(path,outpath,n=3,ft=5,classifier='OneVsRest'):
     start_time = time.time()
     # Reading information about the collection
@@ -116,36 +202,26 @@ def baseline(path,outpath,n=3,ft=5,classifier='OneVsRest'):
             train_docs.extend(read_files(path+os.sep+problem,candidate))
         train_texts = [text for i,(text,label) in enumerate(train_docs)]
         train_labels = [label for i,(text,label) in enumerate(train_docs)]
-        vocabulary = extract_vocabulary(train_docs,n,ft)
-        if attribute == 'baseline-' or 'baseline_1_3-' or 'baseline_4-': # ngram_range(4,4) (0.571) higher than ngram_range(1,3) (0.568) higher than (3,3) (0.507)
-            vectorizer = CountVectorizer(analyzer='char',ngram_range=(n,n),lowercase=False,vocabulary=vocabulary)
-        if attribute == 'tfidf-word-': # 0.126
-            vectorizer = TfidfVectorizer(min_df=3,  max_features=None,
-                strip_accents='unicode', analyzer='word',token_pattern=r'\w{1,}',
-                ngram_range=(n, n), use_idf=1,smooth_idf=1,sublinear_tf=1,
-                stop_words = 'english')
-        if attribute == 'tfidf-char-': # ngram_range(1,3)  (0.51) lower than (3,3) (0.577)
-            vectorizer = TfidfVectorizer(min_df=3, max_features=None,
-                                         strip_accents='unicode', analyzer='char', token_pattern=r'\w{1,}',
-                                         ngram_range=(1, n), use_idf=True, smooth_idf=True, sublinear_tf=True,
-                                         stop_words='english')
 
-        train_data = vectorizer.fit_transform(train_texts)
-        train_data = train_data.astype(float)
-        for i,v in enumerate(train_texts):
-            train_data[i]=train_data[i]/len(train_texts[i]) #normalize
+        # Building test set
+        test_docs = read_files(path + os.sep + problem, unk_folder)
+        test_texts = [text for i, (text, label) in enumerate(test_docs)]
+
+        if attribute == 'baseline-' : # ngram_range(4,4) (0.571) higher than ngram_range(1,3) (0.568) higher than (3,3) (0.507)
+            vectorizer, vocabulary, train_data, test_data = count_data(train_docs,n,ft,train_texts,test_texts)
+            print('\t', 'vocabulary size:', len(vocabulary))
+        if attribute == 'tfidf-char-': # ngram_range(1,3)  (0.51) lower than (3,3) (0.577)
+            vectorizer, vocabulary, train_data, test_data = tfidf_data(train_docs,n,ft,train_texts,test_texts)
+            print('\t', 'vocabulary size:', len(vocabulary))
+        if attribute == 'meta-':
+            scaler, train_data, test_data = meta_data(train_texts,test_texts)
+            print('\t', 'meta feature dimension:', len(train_data))
+
         print('\t', 'language: ', language[index])
         print('\t', len(candidates), 'candidate authors')
         print('\t', len(train_texts), 'known texts')
-        print('\t', 'vocabulary size:', len(vocabulary))
-        # Building test set
-        test_docs=read_files(path+os.sep+problem,unk_folder)
-        test_texts = [text for i,(text,label) in enumerate(test_docs)]
-        test_data = vectorizer.transform(test_texts)
-        test_data = test_data.astype(float)
-        for i,v in enumerate(test_texts):
-            test_data[i]=test_data[i]/len(test_texts[i]) # normalize
         print('\t', len(test_texts), 'unknown texts')
+
         # Applying SVM
         max_abs_scaler = preprocessing.MaxAbsScaler()
         scaled_train_data = max_abs_scaler.fit_transform(train_data)
@@ -162,9 +238,9 @@ def baseline(path,outpath,n=3,ft=5,classifier='OneVsRest'):
         pathlen=len(path+os.sep+problem+os.sep+unk_folder+os.sep)
         for i,v in enumerate(predictions):
             out_data.append({'unknown-text': unk_filelist[i][pathlen:], 'predicted-author': v})
-        with open(outpath+os.sep+'answers-'+ attribute + ml + problem +'.json', 'w') as f:
+        with open(outpath+os.sep+'answers-'+ attribute + ml + ngram_range_name + problem +'.json', 'w') as f:
             json.dump(out_data, f, indent=4)
-        print('\t', 'answers saved to file','answers-' + attribute + ml + problem +'.json')
+        print('\t', 'answers saved to file','answers-' + attribute + ml + ngram_range_name + problem +'.json')
     print('elapsed time:', time.time() - start_time)
 
 def main():
@@ -188,9 +264,14 @@ def main():
     outpath = 'output/answers'
     baseline(path,outpath,4,5)
 
-attributes = ['baseline-','baseline_1_3-','baseline_4-','tfidf-char-','tfidf-word-']
+attributes = ['baseline-', 'tfidf-char-', 'meta-']
+ngram_ranges = [None,(1,3),(3,3),(1,4),(4,4)]
+ngram_range_names = ['No-gram-','1-3-','3-3-','1-4-','4-4-']
 mls = ['baseline-']
-attribute = attributes[3]
+
+attribute = attributes[2]
+ngram_range = ngram_ranges[0]
+ngram_range_name = ngram_range_names[0]
 ml = mls[0]
 
 if __name__ == '__main__':

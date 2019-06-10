@@ -49,7 +49,7 @@ import json
 import warnings
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
 from sklearn.preprocessing import LabelEncoder
-from baseline_add_features import attribute, ml
+from baseline_add_features import attribute, ml, ngram_range_name
 
 def eval_measures(gt, pred):
     """Compute macro-averaged F1-scores, macro-averaged precision, 
@@ -146,19 +146,19 @@ def evaluate_all(path_collection,path_answers,path_out):
     scores=[]
     for problem in problems:
         # with using different features and ml methods, 'embedding-svm-' should be replaced by different feature and ml method combinations
-        f1,precision,recall,accuracy=evaluate(path_collection+os.sep+problem+os.sep+'ground-truth.json',path_answers+os.sep+'answers-' + attribute + ml + problem +'.json')
+        f1,precision,recall,accuracy=evaluate(path_collection+os.sep+problem+os.sep+'ground-truth.json',path_answers+os.sep+'answers-' + attribute + ml + ngram_range_name + problem +'.json')
         scores.append(f1)
         data.append({'problem-name': problem, 'macro-f1': round(f1,3), 'macro-precision': round(precision,3), 'macro-recall': round(recall,3), 'micro-accuracy': round(accuracy,3)})
         print(str(problem),'\nMacro-F1:',round(f1,3),'\nmacro-precision:',round(precision,3), '\nmacro-recall:', round(recall,3), '\nmicro-accuracy:', round(accuracy,3))
     overall_score=sum(scores)/len(scores)
     # Saving data to output files (out.json and evaluation.prototext)
     # by using different features and ml methods, 'embedding-svm-' should be replaced by different feature and ml method combinations
-    with open(path_out+os.sep+'out-{}{}.json'.format(attribute,ml), 'w') as f:
+    with open(path_out+os.sep+'out-{}{}{}.json'.format(attribute,ml,ngram_range_name), 'w') as f:
         json.dump({'problems': data, 'overall_score': round(overall_score,3)}, f, indent=4, sort_keys=True)
     print('Overall F1 score:', round(overall_score,3))
     prototext='measure {\n key: "mean macro-f1"\n value: "'+str(round(overall_score,3))+'"\n}\n'
     # by using different features and ml methods, 'embedding-svm-' should be replaced by different feature and ml method combinations
-    with open(path_out+os.sep+'evaluation-{}{}.prototext'.format(attribute,ml), 'w') as f:
+    with open(path_out+os.sep+'evaluation-{}{}{}.prototext'.format(attribute,ml,ngram_range_name), 'w') as f:
         f.write(prototext)
         
 def main():
