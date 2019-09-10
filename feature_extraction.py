@@ -217,6 +217,7 @@ def problemset():
 
     # meta features
 def meta_features():
+    #done
     sent_len = []
     sent_len.append(np.mean(list(map(
                 lambda x: len(x.split()), sent_tokenize(train1[0])))))
@@ -243,6 +244,7 @@ def tfidffeature():
     return tfv_trainX, tfv_validX, tfv_trainY, tfv_validY, tfv_testX
 
 def countfeature():
+    #done
     ctv = CountVectorizer(analyzer='word',token_pattern=r'\w{1,}',
                 ngram_range=(1, 3), stop_words = 'english')
     all_ctv = ctv.fit_transform(train1)

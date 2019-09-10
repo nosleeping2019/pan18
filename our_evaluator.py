@@ -29,6 +29,8 @@ where
 Example: 
 >>> python pan18-cdaa-evaluator.py -i "input/pan18-cross-domain-authorship-attribution-training-dataset-2017-12-02" -a "output/answers" -o "output/evaluation"
 
+python our_evaluator.py -i "input/pan18-cross-domain-authorship-attribution-training-dataset-2017-12-02" -a "output/answers" -o "output/evaluation"
+
 # References:
 @article{scikit-learn,
  title={Scikit-learn: Machine Learning in {P}ython},

@@ -45,7 +45,11 @@ from string import punctuation
 from nltk.corpus import stopwords
 eng_stopwords = set(stopwords.words("english"))
 from nltk.tokenize import sent_tokenize, word_tokenize
-
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import GridSearchCV
+import xgboost as xgb
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score
 
 def represent_text(text,n):
     # Extracts all character 'n'-grams from  a 'text'
@@ -100,11 +104,14 @@ def meta_features_extractor(corpus):
     sent_len = []
     word_len = []
     word_num = []
+    type_token_r = []
     single_num = []
     punct_num = []
     stop_num = []
     upper_num = []
+    paragraph_len = []
     for paragraph in corpus:
+        paragraph_len.append(len(paragraph))
         ## average lenth of sentences
         sent_len.append(np.mean(list(map(
             lambda x: len(x.split()), sent_tokenize(paragraph)))))
@@ -113,6 +120,8 @@ def meta_features_extractor(corpus):
             lambda x: len(str(x)), word_tokenize(paragraph)))))
         ##number of words
         word_num.append(len(word_tokenize(paragraph)))
+        # type token ration
+        #type_token_r.append(len(set(word_tokenize(paragraph)))/ len(word_tokenize(paragraph)) )
         ##number of single words
         single_num.append(len([w for w in set(word_tokenize(paragraph)) if w not in punctuation]))
         ## average number of punctuation in a sentence
@@ -126,7 +135,7 @@ def meta_features_extractor(corpus):
             lambda x: len([t for t in str(x) if t.isupper()]), sent_tokenize(paragraph)))))
 
         x = np.array([sent_len, word_len, word_num, single_num, punct_num, stop_num, upper_num])
-
+    print(max(paragraph_len),min(paragraph_len))
     return x.T
 
 def meta_data(train_texts,test_texts):
@@ -174,6 +183,69 @@ def tfidf_data(train_docs, n, ft, train_texts,test_texts):
         test_data[i] = test_data[i] / len(test_texts[i])  # normalize
     return vectorizer, vocabulary, train_data, test_data
 
+def linear_svc(train_data, test_data, train_labels, classifier):
+    max_abs_scaler = preprocessing.MaxAbsScaler()
+    scaled_train_data = max_abs_scaler.fit_transform(train_data)
+    scaled_test_data = max_abs_scaler.transform(test_data)
+    if classifier == 'OneVsOne':
+        clf = OneVsOneClassifier(LinearSVC(C=1)).fit(scaled_train_data, train_labels)
+    else:
+        clf = OneVsRestClassifier(LinearSVC(C=1)).fit(scaled_train_data, train_labels)
+    val_scores = cross_val_score(clf, train_data, train_labels, cv = 5, scoring = 'f1_macro')
+    predictions = clf.predict(scaled_test_data)
+    print('val_score: %0.2f (+/- %0.2f)'% (val_scores.mean(), val_scores.std() * 2))
+    return predictions
+
+def bulid_RF(xtrain, xtest, ytrain):
+    rf = RandomForestClassifier( n_jobs = -1, warm_start = True, min_samples_split = 3)
+    rf_parameters = {'n_estimators': np.arange(3000, 22000, 6000)}
+    rf_clf = GridSearchCV(rf, rf_parameters, cv=5, n_jobs=-1)
+    rf_clf.fit(xtrain, ytrain)
+    # rf.fit(xtrain, ytrain)
+    print(rf_clf.best_params_)
+    rf_model = rf_clf.best_estimator_
+    # # loss = multiclass_logloss(yvalid, rf_model.predict_proba(xvalid))
+    prediction = rf_model.predict(xtest)
+    val_scores = cross_val_score(rf_clf, xtrain, ytrain, cv=5, scoring='f1_macro')
+    print('val_score: %0.2f (+/- %0.2f)' % (val_scores.mean(), val_scores.std() * 2))
+    # prediction = rf.predict(xtest)
+    return prediction
+
+def bulid_xgb(xtrain, xtest, ytrain):
+    xgb_clf = xgb.XGBClassifier(learning_rate=0.1, subsample = 0.8, min_samples_split = 5,  max_features = 'sqrt', objective = 'multi:softmax',num_class = len(set(ytrain)))
+    xgb_parameters = {'n_estimators':range(20,300,270)}
+                      # 'colsample_bytree': np.arange(0.1, 0.5, 0.2),
+                      # 'max_depth': np.arange(2,100,30)}
+    xgb_Gclf = GridSearchCV(xgb_clf, xgb_parameters, cv=5, n_jobs=-1)
+    xgb_Gclf.fit(xtrain, ytrain)
+    print(xgb_Gclf.best_params_)
+    xgb_model = xgb_Gclf.best_estimator_
+    # loss = multiclass_logloss(yvalid, xgb_model.predict_proba(xvalid))
+    val_scores = cross_val_score(xgb_model, xtrain, ytrain, cv=5, scoring='f1_macro')
+    print('val_score: %0.2f (+/- %0.2f)' % (val_scores.mean(), val_scores.std() * 2))
+    prediction = xgb_model.predict(xtest)
+    return prediction
+
+def bulid_LR(xtrain, xtest, ytrain):
+    log = LogisticRegression()
+    log_parameters = {'C': np.arange(1, 9, 2), 'solver': ('newton-cg', 'lbfgs', 'liblinear', 'sag', 'saga')}
+    log_clf = GridSearchCV(log, log_parameters, cv=5, n_jobs=-1)  # 寻找最佳参数，这会很慢，如果不想使用，可以自己修改：把log_clf改为log
+    # log.fit(xtrain, ytrain)
+    log_clf.fit(xtrain, ytrain)
+    # print(log_clf.best_params_)
+    log_model = log_clf.best_estimator_
+    #loss = multiclass_logloss(yvalid, log_model.predict_proba(xvalid))  # 模型的loss
+    val_scores = cross_val_score(log_clf, xtrain, ytrain, cv=5, scoring='f1_macro')
+    print('val_score: %0.2f (+/- %0.2f)' % (val_scores.mean(), val_scores.std() * 2))
+    prediction = log_model.predict(xtest)
+    return prediction
+
+def build_bayes(xtrain, xtest, ytrain):
+    from sklearn.naive_bayes import GaussianNB,MultinomialNB,BernoulliNB
+    clf = BernoulliNB()
+    clf.fit(xtrain, ytrain)
+    prediction = clf.predict(xtest)
+    return prediction
 
 def baseline(path,outpath,n=3,ft=5,classifier='OneVsRest'):
     start_time = time.time()
@@ -207,7 +279,7 @@ def baseline(path,outpath,n=3,ft=5,classifier='OneVsRest'):
         test_docs = read_files(path + os.sep + problem, unk_folder)
         test_texts = [text for i, (text, label) in enumerate(test_docs)]
 
-        if attribute == 'baseline-' : # ngram_range(4,4) (0.571) higher than ngram_range(1,3) (0.568) higher than (3,3) (0.507)
+        if attribute == 'count-' : # ngram_range(4,4) (0.571) higher than ngram_range(1,3) (0.568) higher than (3,3) (0.507)
             vectorizer, vocabulary, train_data, test_data = count_data(train_docs,n,ft,train_texts,test_texts)
             print('\t', 'vocabulary size:', len(vocabulary))
         if attribute == 'tfidf-char-': # ngram_range(1,3)  (0.51) lower than (3,3) (0.577)
@@ -222,16 +294,22 @@ def baseline(path,outpath,n=3,ft=5,classifier='OneVsRest'):
         print('\t', len(train_texts), 'known texts')
         print('\t', len(test_texts), 'unknown texts')
 
-        # Applying SVM
-        max_abs_scaler = preprocessing.MaxAbsScaler()
-        scaled_train_data = max_abs_scaler.fit_transform(train_data)
-        scaled_test_data = max_abs_scaler.transform(test_data)
-        if classifier=='OneVsOne':
-            clf=OneVsOneClassifier(LinearSVC(C=1)).fit(scaled_train_data, train_labels)
-        else:
-            clf=OneVsRestClassifier(LinearSVC(C=1)).fit(scaled_train_data, train_labels)
-        predictions=clf.predict(scaled_test_data)
-        print('predictions',predictions)
+        if ml == 'baseline-': # Applying SVM
+            predictions = linear_svc(train_data, test_data,train_labels, classifier)
+            print('predictions', predictions)
+        if ml == 'rf-': # applying random forest
+            predictions = bulid_RF(train_data, test_data, train_labels)
+            print('predictions', predictions)
+        if ml == 'xgb-': # applying xgb
+            predictions = bulid_xgb(train_data, test_data, train_labels)
+            print('predictions', predictions)
+        if ml == 'lr-': # applying lr
+            predictions = bulid_LR(train_data, test_data, train_labels)
+            print('predictions', predictions)
+        if ml == 'bayes-':
+            predictions = build_bayes(train_data, test_data, train_labels)
+            print('predictions', predictions)
+
         # Writing output file
         out_data=[]
         unk_filelist = glob.glob(path+os.sep+problem+os.sep+unk_folder+os.sep+'*.txt')
@@ -264,15 +342,15 @@ def main():
     outpath = 'output/answers'
     baseline(path,outpath,4,5)
 
-attributes = ['baseline-', 'tfidf-char-', 'meta-']
-ngram_ranges = [None,(1,3),(3,3),(1,4),(4,4)]
-ngram_range_names = ['No-gram-','1-3-','3-3-','1-4-','4-4-']
-mls = ['baseline-']
+attributes = ['count-', 'tfidf-char-', 'meta-','embedding-']
+ngram_ranges = [None,(1,1),(1,3),(3,3),(1,4),(4,4)]
+ngram_range_names = ['','1-1-','1-3-','3-3-','1-4-','4-4-']
+mls = ['baseline-', 'rf-', 'xgb-', 'lr-','bayes-','LSTM-']
 
-attribute = attributes[2]
-ngram_range = ngram_ranges[0]
-ngram_range_name = ngram_range_names[0]
-ml = mls[0]
+attribute = attributes[0]
+ngram_range = ngram_ranges[3]
+ngram_range_name = ngram_range_names[4]
+ml = mls[2]
 
 if __name__ == '__main__':
     main()
